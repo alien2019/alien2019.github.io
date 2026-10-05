@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "exportedAt": "2026-10-05T00:00:00.000Z",
+  "config": {
+    "logo": "🎧",
+    "name": "英语陪练",
+    "color": "#2563EB",
+    "voice": ""
+  },
+  "banks": [
+    {
+      "id": "sample_import",
+      "name": "示例：英语时态练习",
+      "items": [
+        { "zh": "我昨天去了学校。", "en": "I went to school yesterday." },
+        { "zh": "她正在读一本书。", "en": "She is reading a book." },
+        { "zh": "他们明天会来。", "en": "They will come tomorrow." },
+        { "zh": "我已经吃过午饭了。", "en": "I have already had lunch." },
+        { "zh": "他每天跑步。", "en": "He runs every day." },
+        { "zh": "我们正在开会。", "en": "We are having a meeting." },
+        { "zh": "你什么时候到的？", "en": "When did you arrive?" },
+        { "zh": "这道题太难了。", "en": "This question is too difficult." }
+      ]
+    },
+    {
+      "id": "sample_phrase",
+      "name": "示例：常用短语",
+      "items": [
+        { "zh": "起床", "en": "get up" },
+        { "zh": "吃早饭", "en": "have breakfast" },
+        { "zh": "上班", "en": "go to work" },
+        { "zh": "看电影", "en": "watch a movie" },
+        { "zh": "散步", "en": "take a walk" },
+        { "zh": "做作业", "en": "do homework" },
+        { "zh": "睡觉", "en": "go to bed" },
+        { "zh": "打电话", "en": "make a phone call" }
+      ]
+    }
+  ]
+}
