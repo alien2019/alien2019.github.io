@@ -1,178 +1,146 @@
 /* ============================================================
-   英语陪练 · 主逻辑 v1.0
+   英语陪练 · 主逻辑 v2.0  (assets/js/app.js)
    ------------------------------------------------------------
-   纯前端，无任何外部依赖。
-   数据层：localStorage（key: eng_trainer_v1）
-   结构：{ version, config:{logo,name,color,voice}, banks:[{id,name,items:[{zh,en}]}] }
+   v2 新增：
+   - 多成员档案（小朋友 / 大人独立学习数据）
+   - 学习规划（每日目标 / 题库 / 题型 / 练习日）
+   - 进度追踪（今日任务 / 连续打卡 / 正确率 / 14 天趋势）
+   - 激励机制（积分 / 等级 / 徽章 / 撒花庆祝 / 语音鼓励）
+   - 语音交互配置（自动读题 / 读答案 / 语速音调 / 麦克风作答）
+   - PWA（Service Worker 注册在 index.html 内联脚本中）
+   v1 全部功能保留：三种练习模式、题库导入管理、双判分、备份迁移、外观配置。
+   数据层：localStorage（v2，自动迁移 v1）
    ============================================================ */
 (function () {
   'use strict';
 
-  var STORE_KEY = 'eng_trainer_v1';
   var $ = function (id) { return document.getElementById(id); };
 
   /* ============================================================
-     一、默认数据
+     一、默认数据（题库 + v2 骨架）
      ============================================================ */
-  var DEFAULT_DATA = {
-    version: 1,
-    config: { logo: '🎧', name: '英语陪练', color: '#2563EB', voice: '' },
-    banks: [
-      {
-        id: 'primary',
-        name: '小学基础 20 句',
-        items: [
-          { zh: '苹果', en: 'apple' },
-          { zh: '香蕉', en: 'banana' },
-          { zh: '橙子', en: 'orange' },
-          { zh: '学校', en: 'school' },
-          { zh: '老师', en: 'teacher' },
-          { zh: '学生', en: 'student' },
-          { zh: '书', en: 'book' },
-          { zh: '铅笔', en: 'pencil' },
-          { zh: '书包', en: 'schoolbag' },
-          { zh: '教室', en: 'classroom' },
-          { zh: '我是一名学生。', en: 'I am a student.' },
-          { zh: '这是我的书。', en: 'This is my book.' },
-          { zh: '我喜欢苹果。', en: 'I like apples.' },
-          { zh: '她是一名老师。', en: 'She is a teacher.' },
-          { zh: '你今天好吗？', en: 'How are you today?' },
-          { zh: '我很好，谢谢你。', en: 'I am fine, thank you.' },
-          { zh: '现在几点了？', en: 'What time is it now?' },
-          { zh: '我每天七点起床。', en: 'I get up at seven every day.' },
-          { zh: '我有一只猫。', en: 'I have a cat.' },
-          { zh: '今天是星期一。', en: 'Today is Monday.' }
-        ]
-      },
-      {
-        id: 'daily',
-        name: '日常口语 15 句',
-        items: [
-          { zh: '早上好', en: 'Good morning' },
-          { zh: '晚安', en: 'Good night' },
-          { zh: '见到你很高兴', en: 'Nice to meet you' },
-          { zh: '请问洗手间在哪里？', en: 'Where is the restroom?' },
-          { zh: '这个多少钱？', en: 'How much is this?' },
-          { zh: '太贵了', en: 'That is too expensive' },
-          { zh: '请再说一遍', en: 'Please say that again' },
-          { zh: '我听不懂', en: 'I do not understand' },
-          { zh: '你能说慢一点吗？', en: 'Could you speak more slowly?' },
-          { zh: '我想点一杯咖啡', en: 'I would like a cup of coffee' },
-          { zh: '买单，谢谢', en: 'The bill, please' },
-          { zh: '不客气', en: 'You are welcome' },
-          { zh: '对不起，我迟到了', en: 'Sorry, I am late' },
-          { zh: '祝你生日快乐', en: 'Happy birthday to you' },
-          { zh: '明天见', en: 'See you tomorrow' }
-        ]
-      },
-      {
-        id: 'business',
-        name: '职场英语 15 句',
-        items: [
-          { zh: '我们下周开个会吧。', en: 'Let us have a meeting next week.' },
-          { zh: '请查收附件。', en: 'Please find the attachment.' },
-          { zh: '我会尽快回复你。', en: 'I will get back to you as soon as possible.' },
-          { zh: '这个项目进展如何？', en: 'How is the project going?' },
-          { zh: '我们需要更多时间。', en: 'We need more time.' },
-          { zh: '感谢你的支持。', en: 'Thank you for your support.' },
-          { zh: '我对这个方案有疑问。', en: 'I have some questions about this proposal.' },
-          { zh: '请确认一下时间安排。', en: 'Please confirm the schedule.' },
-          { zh: '我们会按时交付。', en: 'We will deliver on time.' },
-          { zh: '这份报告需要修改。', en: 'This report needs revision.' },
-          { zh: '请把资料发给我。', en: 'Please send me the materials.' },
-          { zh: '我同意你的看法。', en: 'I agree with you.' },
-          { zh: '让我们确认一下细节。', en: 'Let us confirm the details.' },
-          { zh: '预算大约是多少？', en: 'What is the approximate budget?' },
-          { zh: '期待与您合作。', en: 'Looking forward to working with you.' }
-        ]
-      }
-    ]
-  };
+  var DEFAULT_BANKS = [
+    {
+      id: 'primary',
+      name: '小学基础 20 句',
+      items: [
+        { zh: '苹果', en: 'apple' },
+        { zh: '香蕉', en: 'banana' },
+        { zh: '橙子', en: 'orange' },
+        { zh: '学校', en: 'school' },
+        { zh: '老师', en: 'teacher' },
+        { zh: '学生', en: 'student' },
+        { zh: '书', en: 'book' },
+        { zh: '铅笔', en: 'pencil' },
+        { zh: '书包', en: 'schoolbag' },
+        { zh: '教室', en: 'classroom' },
+        { zh: '我是一名学生。', en: 'I am a student.' },
+        { zh: '这是我的书。', en: 'This is my book.' },
+        { zh: '我喜欢苹果。', en: 'I like apples.' },
+        { zh: '她是一名老师。', en: 'She is a teacher.' },
+        { zh: '你今天好吗？', en: 'How are you today?' },
+        { zh: '我很好，谢谢你。', en: 'I am fine, thank you.' },
+        { zh: '现在几点了？', en: 'What time is it now?' },
+        { zh: '我每天七点起床。', en: 'I get up at seven every day.' },
+        { zh: '我有一只猫。', en: 'I have a cat.' },
+        { zh: '今天是星期一。', en: 'Today is Monday.' }
+      ]
+    },
+    {
+      id: 'daily',
+      name: '日常口语 15 句',
+      items: [
+        { zh: '早上好', en: 'Good morning' },
+        { zh: '晚安', en: 'Good night' },
+        { zh: '见到你很高兴', en: 'Nice to meet you' },
+        { zh: '请问洗手间在哪里？', en: 'Where is the restroom?' },
+        { zh: '这个多少钱？', en: 'How much is this?' },
+        { zh: '太贵了', en: 'That is too expensive' },
+        { zh: '请再说一遍', en: 'Please say that again' },
+        { zh: '我听不懂', en: 'I do not understand' },
+        { zh: '你能说慢一点吗？', en: 'Could you speak more slowly?' },
+        { zh: '我想点一杯咖啡', en: 'I would like a cup of coffee' },
+        { zh: '买单，谢谢', en: 'The bill, please' },
+        { zh: '不客气', en: 'You are welcome' },
+        { zh: '对不起，我迟到了', en: 'Sorry, I am late' },
+        { zh: '祝你生日快乐', en: 'Happy birthday to you' },
+        { zh: '明天见', en: 'See you tomorrow' }
+      ]
+    },
+    {
+      id: 'business',
+      name: '职场英语 15 句',
+      items: [
+        { zh: '我们下周开个会吧。', en: 'Let us have a meeting next week.' },
+        { zh: '请查收附件。', en: 'Please find the attachment.' },
+        { zh: '我会尽快回复你。', en: 'I will get back to you as soon as possible.' },
+        { zh: '这个项目进展如何？', en: 'How is the project going?' },
+        { zh: '我们需要更多时间。', en: 'We need more time.' },
+        { zh: '感谢你的支持。', en: 'Thank you for your support.' },
+        { zh: '我对这个方案有疑问。', en: 'I have some questions about this proposal.' },
+        { zh: '请确认一下时间安排。', en: 'Please confirm the schedule.' },
+        { zh: '我们会按时交付。', en: 'We will deliver on time.' },
+        { zh: '这份报告需要修改。', en: 'This report needs revision.' },
+        { zh: '请把资料发给我。', en: 'Please send me the materials.' },
+        { zh: '我同意你的看法。', en: 'I agree with you.' },
+        { zh: '让我们确认一下细节。', en: 'Let us confirm the details.' },
+        { zh: '预算大约是多少？', en: 'What is the approximate budget?' },
+        { zh: '期待与您合作。', en: 'Looking forward to working with you.' }
+      ]
+    }
+  ];
+
+  function defaultData() {
+    return {
+      version: 2,
+      activeProfileId: null,
+      config: EngStore.clone(EngStore.DEFAULT_CONFIG),
+      banks: EngStore.clone(DEFAULT_BANKS),
+      profiles: EngStore.defaultProfiles()
+    };
+  }
 
   /* ============================================================
-     二、数据读写
+     二、数据读写（经 EngStore，含 v1→v2 迁移）
      ============================================================ */
-  var store = {
-    read: function () {
-      try {
-        var raw = localStorage.getItem(STORE_KEY);
-        if (!raw) return null;
-        var d = JSON.parse(raw);
-        if (!d || !Array.isArray(d.banks)) return null;
-        // 兼容：补齐缺失字段
-        d.config = Object.assign({}, DEFAULT_DATA.config, d.config || {});
-        d.banks.forEach(function (b) {
-          if (!b.id) b.id = 'bank_' + Math.random().toString(36).slice(2, 8);
-          if (!b.name) b.name = '未命名题库';
-          if (!Array.isArray(b.items)) b.items = [];
-          b.items.forEach(function (it) {
-            it.zh = String(it.zh || '').trim();
-            it.en = String(it.en || '').trim();
-          });
-        });
-        return d;
-      } catch (e) {
-        console.warn('读取本地数据失败，已回退默认题库', e);
-        return null;
-      }
-    },
-    write: function (data) {
-      try {
-        localStorage.setItem(STORE_KEY, JSON.stringify(data));
-        return true;
-      } catch (e) {
-        alert('保存失败：本机存储空间已满或被浏览器禁用。\n建议先导出备份后清理。');
-        console.error(e);
-        return false;
-      }
-    },
-    reset: function () {
-      try { localStorage.removeItem(STORE_KEY); } catch (e) {}
-      return clone(DEFAULT_DATA);
-    }
-  };
+  var DATA = EngStore.load() || defaultData();
+  if (!DATA.banks.length) DATA.banks = EngStore.clone(DEFAULT_BANKS);
+  EngStore.normalize(DATA);
+  persist();   // 启动即落盘：v1 迁移结果与新用户默认数据立刻持久化，避免未操作就关闭页面导致丢失
 
-  function clone(o) { return JSON.parse(JSON.stringify(o)); }
-
-  var DATA = store.read() || clone(DEFAULT_DATA);
-  function persist() { store.write(DATA); }
+  function persist() { EngStore.save(DATA); }
+  function AP() { return EngStore.activeProfile(DATA); }   // 当前成员
+  function SPCFG() { return DATA.config.speech; }          // 语音配置
 
   /* ============================================================
      三、全局状态
      ============================================================ */
   var state = {
-    mode: 'zh2en',       // zh2en | en2zh | listen | mix
+    mode: 'zh2en',
     bankId: null,
-    strict: 'smart',     // smart | strict
+    strict: 'smart',
     count: 10,
-    queue: [],           // 本轮题目
+    queue: [],
     idx: 0,
     score: 0,
     wrong: [],
     answered: false,
     manageBankId: null,
     impTab: 'text',
-    fileItems: null
+    fileItems: null,
+    roundGained: 0,      // 本轮获得积分
+    roundGoalDone: false // 本轮中是否触发每日目标达成
   };
 
   var MODE_LABEL = { zh2en: '中译英', en2zh: '英译中', listen: '听力朗读', mix: '混合模式' };
 
   /* ============================================================
-     四、工具函数
+     四、工具函数（v1 保留）
      ============================================================ */
-
-  /** 拆分「英文」字段的多答案写法：用 / 或 ; 分隔，如 a / an */
   function splitAnswers(en) {
     return String(en).split(/\s*[\/;；|]\s*/).map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
-  /**
-   * 归一化
-   * @param {string} s 待处理文本
-   * @param {boolean} forEn 是否按英文处理
-   * @param {boolean} keepCase 是否保留大小写（严格模式下为 true）
-   * @param {boolean} keepPunct 是否保留标点（严格模式下为 true）
-   */
   function normalize(s, forEn, keepCase, keepPunct) {
     var t = String(s || '').trim();
     t = t.replace(/\s+/g, ' ');
@@ -186,7 +154,6 @@
     return t.trim();
   }
 
-  /** 计算编辑距离 */
   function levenshtein(a, b) {
     if (a === b) return 0;
     if (!a.length) return b.length;
@@ -207,19 +174,12 @@
     return prev[b.length];
   }
 
-  /**
-   * 判分
-   * 严格模式：保留大小写，逐字比对（仍容忍首尾空格）
-   * 宽松模式：忽略大小写、标点、空格差异，且编辑距离 ≤1 视为答对
-   * @returns { ok:boolean, exact:boolean, best:string, near:boolean }
-   */
   function judge(userInput, correctField, strictMode, forEn) {
     var input = String(userInput || '').trim();
     if (!input) return { ok: false, exact: false, best: correctField, near: false };
 
     var candidates = forEn ? splitAnswers(correctField) : [String(correctField).trim()];
     var strict = (strictMode === 'strict');
-    // 严格模式：保留大小写与标点，逐字比对；宽松模式：忽略大小写/标点/空格差异
     var uNorm = normalize(input, forEn, strict, strict);
     var best = candidates[0], bestDist = Infinity, exact = false;
 
@@ -230,52 +190,23 @@
       if (d < bestDist) { bestDist = d; best = c; }
     });
 
-    if (exact) return { ok: true, exact: true, best: best, near: false, ratio: 1 };
+    if (exact) return { ok: true, exact: true, best: best, near: false };
 
-    if (strict) {
-      return { ok: false, exact: false, best: best, near: false, ratio: 0 };
-    }
+    if (strict) return { ok: false, exact: false, best: best, near: false };
 
-    // 智能宽松：编辑距离 <=1 且原长度 >=4 时算对（容错拼写小错）
     var baseLen = Math.max(uNorm.length, normalize(best, forEn, false, false).length);
     var near = bestDist <= 1 && baseLen >= 4 && uNorm.length > 0;
-    return { ok: near, exact: false, best: best, near: near, ratio: baseLen ? 1 - bestDist / baseLen : 0 };
+    return { ok: near, exact: false, best: best, near: near };
   }
 
-  /** 语音朗读 */
-  function speak(text, btnEl) {
-    if (!('speechSynthesis' in window)) {
-      alert('当前浏览器不支持语音朗读，建议使用 Chrome / Edge / Safari。');
-      return;
-    }
-    try {
-      window.speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-US';
-      u.rate = 0.85;
-      u.pitch = 1;
-      var voices = window.speechSynthesis.getVoices().filter(function (v) {
-        return /^en/i.test(v.lang);
-      });
-      var chosen = null;
-      // 优先用户在后台指定的语音
-      if (DATA.config.voice) {
-        chosen = voices.filter(function (v) { return v.name === DATA.config.voice; })[0] || null;
-      }
-      // 其次英语女声
-      if (!chosen) {
-        chosen = voices.filter(function (v) { return /female|Samantha|Zira|Google US English|Karen|Moira/i.test(v.name); })[0] || null;
-      }
-      if (!chosen && voices.length) chosen = voices[0];
-      if (chosen) u.voice = chosen;
-
-      if (btnEl) { btnEl.disabled = true; }
-      u.onend = u.onerror = function () { if (btnEl) btnEl.disabled = false; };
-      window.speechSynthesis.speak(u);
-    } catch (e) {
-      console.warn('朗读失败', e);
-      if (btnEl) btnEl.disabled = false;
-    }
+  /* v1 speak() 保留签名，内部走 EngSpeech（可配置） */
+  function speak(text, btnEl, opt) {
+    opt = opt || {};
+    return EngSpeech.speak(text, SPCFG(), {
+      forEnglish: opt.forEnglish !== false,
+      btn: btnEl || null,
+      onend: opt.onend || null
+    });
   }
 
   function shuffle(arr) {
@@ -300,23 +231,25 @@
     return null;
   }
 
-  function uid(prefix) {
-    return (prefix || 'id') + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  }
+  function uid(prefix) { return EngStore.uid(prefix); }
 
   /* ============================================================
-     五、视图切换
+     五、视图切换（v2：增加 plan / profile）
      ============================================================ */
   function goto(view) {
-    ['home', 'practice', 'result', 'manage'].forEach(function (v) {
+    ['home', 'practice', 'result', 'plan', 'profile', 'manage'].forEach(function (v) {
       var el = $('view-' + v);
       if (el) el.classList.toggle('active', v === view);
     });
     document.querySelectorAll('.navbtn').forEach(function (b) {
       b.classList.toggle('active', b.getAttribute('data-view') === view);
     });
+    closeProfileMenu();
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (view === 'manage') renderManage();
+    if (view === 'plan') renderPlan();
+    if (view === 'profile') renderProfileList();
+    if (view === 'home') renderTodayCard();
   }
 
   document.querySelectorAll('[data-view]').forEach(function (el) {
@@ -324,7 +257,7 @@
   });
 
   /* ============================================================
-     六、主题配色
+     六、主题配色（v1 保留 + 应用语音设置到 UI）
      ============================================================ */
   function applyConfig() {
     var c = DATA.config;
@@ -340,10 +273,124 @@
   }
 
   /* ============================================================
-     七、首页
+     七、成员切换器
      ============================================================ */
+  function renderProfileChip() {
+    var p = AP();
+    $('chipAvatar').textContent = p.avatar;
+    $('chipName').textContent = p.name;
+  }
+
+  function renderProfileMenu() {
+    var list = $('pmList');
+    list.innerHTML = DATA.profiles.map(function (p) {
+      var t = EngStore.todayStat(p);
+      var goal = +p.plan.dailyGoal || 10;
+      var done = Math.min(t.done, goal);
+      return '<button class="pm-item' + (p.id === DATA.activeProfileId ? ' active' : '') + '" data-pid="' + p.id + '">' +
+        '<span class="pm-avatar">' + p.avatar + '</span>' +
+        '<span class="pm-mid"><b>' + escapeHtml(p.name) + '</b>' +
+        '<small>' + (p.type === 'kid' ? '小朋友' : '大人') + ' · ⭐' + p.stats.points + ' · 今日 ' + t.done + '/' + goal + '</small></span>' +
+        '<span class="pm-check">' + (p.id === DATA.activeProfileId ? '✓' : '') + '</span>' +
+        '</button>';
+    }).join('');
+    list.querySelectorAll('[data-pid]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        DATA.activeProfileId = b.getAttribute('data-pid');
+        persist();
+        closeProfileMenu();
+        renderProfileChip();
+        applyPlanToHome();
+        renderTodayCard();
+        renderProfileMenu();
+      });
+    });
+  }
+
+  function closeProfileMenu() {
+    $('profileMenu').style.display = 'none';
+  }
+
+  function bindProfileChip() {
+    $('profileChip').addEventListener('click', function (e) {
+      e.stopPropagation();
+      var m = $('profileMenu');
+      var show = m.style.display === 'none';
+      if (show) renderProfileMenu();
+      m.style.display = show ? 'block' : 'none';
+    });
+    document.addEventListener('click', function (e) {
+      if (!$('profileMenu').contains(e.target) && e.target !== $('profileChip')) closeProfileMenu();
+    });
+    $('pmAddBtn').addEventListener('click', function () {
+      openProfileEditor(null);
+    });
+  }
+
+  /* ============================================================
+     八、首页（v1 保留 + 应用成员规划 + 今日任务卡）
+     ============================================================ */
+  function applyPlanToHome() {
+    var p = AP();
+    // 题型：按规划顺序取第一个
+    var mode = (p.plan.modes && p.plan.modes[0]) || 'zh2en';
+    state.mode = mode;
+    document.querySelectorAll('.mode-card').forEach(function (c) {
+      c.classList.toggle('selected', c.getAttribute('data-mode') === mode);
+    });
+    // 题库
+    state.bankId = p.plan.bankId || '__all__';
+    var sel = $('bankSelect');
+    if (state.bankId !== '__all__' && !findBank(state.bankId)) state.bankId = '__all__';
+    sel.value = state.bankId;
+    // 判分
+    state.strict = p.plan.strict || 'smart';
+    $('strictSelect').value = state.strict;
+    // 数量默认对齐每日目标（取接近档位）
+    var g = +p.plan.dailyGoal || 10;
+    var counts = [5, 10, 20, 999];
+    var near = counts[0];
+    counts.forEach(function (c) { if (Math.abs(c - g) < Math.abs(near - g)) near = c; });
+    $('countSelect').value = String(near);
+    state.count = near;
+    updateBankMeta();
+    renderPlanHint();
+  }
+
+  function renderPlanHint() {
+    var p = AP();
+    var el = $('planModeHint');
+    var days = ['日', '一', '二', '三', '四', '五', '六'];
+    var wd = (p.plan.weekdays || []).map(function (d) { return days[+d]; }).join('、');
+    el.innerHTML = '📋 <b>' + escapeHtml(p.name) + '</b> 的规划：每日 ' + p.plan.dailyGoal + ' 题 · ' +
+      (wd ? '练习日：周' + wd : '未设置练习日') +
+      ' · <a href="#" data-goto="plan">修改规划</a>';
+    var a = el.querySelector('[data-goto]');
+    if (a) a.addEventListener('click', function (e) { e.preventDefault(); goto('plan'); });
+  }
+
+  function renderTodayCard() {
+    var p = AP();
+    var t = EngStore.todayStat(p);
+    var goal = +p.plan.dailyGoal || 10;
+    var done = t.done, pct = Math.min(100, Math.round(done / goal * 100));
+    $('todayTitle').textContent = p.name + ' · 今日任务';
+    $('todayNum').textContent = done + ' / ' + goal + ' 题';
+    if (done >= goal) {
+      $('todayHint').textContent = '🎉 今日任务已完成，太棒了！';
+    } else {
+      $('todayHint').textContent = '再练 ' + (goal - done) + ' 题完成今日目标';
+    }
+    $('ringText').textContent = pct + '%';
+    var fg = $('ringFg');
+    var C = 2 * Math.PI * 30;
+    fg.style.strokeDasharray = C;
+    fg.style.strokeDashoffset = C * (1 - pct / 100);
+    $('todayStreak').textContent = '🔥 连续 ' + p.stats.streak + ' 天';
+    $('todayPoints').textContent = '⭐ ' + p.stats.points + ' 分';
+  }
+
   function initHome() {
-    // 题型
     document.querySelectorAll('.mode-card').forEach(function (card) {
       card.addEventListener('click', function () {
         state.mode = card.getAttribute('data-mode');
@@ -352,22 +399,18 @@
         });
       });
     });
-    var first = document.querySelector('.mode-card');
-    if (first) first.classList.add('selected');
 
-    // 题库下拉
     var sel = $('bankSelect');
     sel.innerHTML = '<option value="__all__">全部题库（随机抽题）</option>' +
       DATA.banks.map(function (b) {
         return '<option value="' + b.id + '">' + escapeHtml(b.name) + '（' + b.items.length + ' 题）</option>';
       }).join('');
-    state.bankId = '__all__';
     sel.addEventListener('change', function () { state.bankId = sel.value; updateBankMeta(); });
-    updateBankMeta();
 
     $('countSelect').addEventListener('change', function () { state.count = parseInt(this.value, 10); });
     $('strictSelect').addEventListener('change', function () { state.strict = this.value; });
     $('startBtn').addEventListener('click', startPractice);
+    applyPlanToHome();
   }
 
   function collectItems() {
@@ -384,23 +427,40 @@
     var items = collectItems();
     var el = $('bankMeta');
     if (!items.length) {
-      el.textContent = '⚠️ 这个题库还没有题目，请先到「题库管理」添加或导入。';
+      el.textContent = '⚠️ 这个题库还没有题目，请先到「题库」添加或导入。';
     } else {
       el.textContent = '共 ' + items.length + ' 道题可用，本次随机抽取。';
     }
   }
 
+  function syncHomeSelect() {
+    var sel = $('bankSelect');
+    var cur = state.bankId;
+    sel.innerHTML = '<option value="__all__">全部题库（随机抽题）</option>' +
+      DATA.banks.map(function (b) {
+        return '<option value="' + b.id + '">' + escapeHtml(b.name) + '（' + b.items.length + ' 题）</option>';
+      }).join('');
+    if (cur && (cur === '__all__' || findBank(cur))) sel.value = cur;
+    else { state.bankId = '__all__'; sel.value = '__all__'; }
+    updateBankMeta();
+    var pb = $('planBank');
+    if (pb) {
+      pb.innerHTML = '<option value="__all__">全部题库（混合抽题）</option>' +
+        DATA.banks.map(function (b) {
+          return '<option value="' + b.id + '">' + escapeHtml(b.name) + '（' + b.items.length + ' 题）</option>';
+        }).join('');
+    }
+  }
+
   /* ============================================================
-     八、练习流程
+     九、练习流程（v1 保留 + 进度记录 + 语音交互 + 激励）
      ============================================================ */
   function startPractice() {
     var items = collectItems();
     if (!items.length) {
-      alert('当前题库没有题目。\n请先到「题库管理」页面添加或导入题目。');
+      alert('当前题库没有题目。\n请先到「题库」页面添加或导入题目。');
       return;
     }
-
-    // 过滤掉缺字段的题
     items = items.filter(function (it) { return it.zh && it.en; });
     if (!items.length) {
       alert('当前题库的题目中文或英文不完整，请先补全。');
@@ -416,6 +476,8 @@
     state.idx = 0;
     state.score = 0;
     state.wrong = [];
+    state.roundGained = 0;
+    state.roundGoalDone = false;
     goto('practice');
     renderQuestion();
   }
@@ -433,6 +495,7 @@
 
     var promptEl = $('qPrompt');
     var speakBtn = $('speakBtn');
+    var cfg = SPCFG();
 
     if (q.mode === 'zh2en') {
       promptEl.classList.remove('small');
@@ -449,7 +512,16 @@
       promptEl.textContent = '🔊 请点击播放，听发音后写出英文';
       speakBtn.style.display = 'block';
       $('answerInput').placeholder = '请写出你听到的英文…';
-      setTimeout(function () { speak(q.en, speakBtn); }, 350);
+    }
+
+    // 麦克风语音作答按钮显隐
+    var micRow = $('micRow');
+    if (EngSpeech.canRecognize() && cfg.recognize) {
+      micRow.style.display = 'flex';
+      $('micBtn').textContent = q.mode === 'en2zh' ? '🎙️ 说中文（语音作答）' : '🎙️ 说英文（语音作答）';
+      $('micHint').textContent = '';
+    } else {
+      micRow.style.display = 'none';
     }
 
     var input = $('answerInput');
@@ -465,6 +537,16 @@
     $('nextBtn').style.display = 'none';
     $('submitBtn').disabled = false;
     $('skipBtn').disabled = false;
+
+    // 自动朗读：听力模式必读；其它模式按配置
+    if (q.mode === 'listen') {
+      setTimeout(function () { speak(q.en, speakBtn); }, Math.max(150, +cfg.listenDelay || 350));
+    } else if (cfg.enabled && cfg.readPrompt) {
+      var text = (q.mode === 'en2zh') ? q.en : q.zh;
+      var forEn = (q.mode === 'en2zh');
+      // 中文题干是否朗读也遵循开关；默认读题干能帮助低龄儿童
+      speak(text, null, { forEnglish: forEn });
+    }
   }
 
   function submitAnswer() {
@@ -484,14 +566,24 @@
 
     state.answered = true;
     var fb = $('feedback');
+    var cfg = SPCFG();
+
+    // ---- v2：进度 + 激励 ----
+    var p = AP();
+    var ev = EngStore.recordAnswer(p, r.ok);
+    state.roundGained += ev.gained;
+    if (ev.goalJustDone) state.roundGoalDone = true;
+    persist();
+    renderTodayCard();
 
     if (r.ok) {
       state.score++;
       fb.className = 'feedback show ok';
       fb.innerHTML = '<b>✅ ' + (r.exact ? '完全正确！' : '答对了！（拼写略有差异，已按宽松模式判对）') + '</b>' +
+        '<div class="ans-line">+ ' + ev.gained + ' 分</div>' +
         '<div class="ans-line">参考答案：<span>' + escapeHtml(correctField) + '</span></div>';
-      // 听力题：答对后再朗读一遍强化记忆
-      if (q.mode === 'listen') speak(q.en, null);
+      if (cfg.enabled && cfg.readFeedback) speak(r.exact ? 'Great job!' : 'Good! Well done.', null, { forEnglish: true });
+      if (cfg.enabled && cfg.readAnswer && forEn) speak(correctField, null, { forEnglish: true });
     } else {
       state.wrong.push({
         zh: q.zh, en: q.en, mode: q.mode,
@@ -504,6 +596,8 @@
         '<div class="ans-line">你的答案：<span>' + escapeHtml(String(input).trim()) + '</span></div>' +
         '<div class="ans-line">正确答案：<span>' + escapeHtml(correctField) + '</span></div>' +
         (r.near ? '<div class="ans-line">（很接近了，注意拼写细节）</div>' : '');
+      if (cfg.enabled && cfg.readFeedback) speak('Oops! Try to remember.', null, { forEnglish: true });
+      if (cfg.enabled && cfg.readAnswer) speak(correctField, null, { forEnglish: forEn });
     }
 
     $('answerInput').disabled = true;
@@ -527,6 +621,7 @@
     var fb = $('feedback');
     fb.className = 'feedback show info';
     fb.innerHTML = '<b>已跳过</b><div class="ans-line">正确答案：<span>' + escapeHtml(correctField) + '</span></div>';
+    if (SPCFG().enabled && SPCFG().readAnswer) speak(correctField, null, { forEnglish: q.mode !== 'en2zh' });
     $('answerInput').disabled = true;
     $('submitBtn').style.display = 'none';
     $('skipBtn').style.display = 'none';
@@ -541,6 +636,45 @@
     else renderQuestion();
   }
 
+  /* ---------- 撒花（纯 canvas，无依赖） ---------- */
+  function confetti(duration) {
+    var cv = $('confetti');
+    cv.style.display = 'block';
+    var ctx = cv.getContext('2d');
+    cv.width = window.innerWidth;
+    cv.height = window.innerHeight;
+    var colors = ['#F43F5E', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+    var parts = [];
+    for (var i = 0; i < 120; i++) {
+      parts.push({
+        x: Math.random() * cv.width,
+        y: -20 - Math.random() * cv.height * 0.5,
+        w: 6 + Math.random() * 6,
+        h: 8 + Math.random() * 8,
+        c: colors[Math.floor(Math.random() * colors.length)],
+        vy: 2 + Math.random() * 3.5,
+        vx: -1.5 + Math.random() * 3,
+        rot: Math.random() * Math.PI,
+        vr: -0.1 + Math.random() * 0.2
+      });
+    }
+    var start = Date.now();
+    (function frame() {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      parts.forEach(function (pt) {
+        pt.x += pt.vx; pt.y += pt.vy; pt.rot += pt.vr;
+        ctx.save();
+        ctx.translate(pt.x, pt.y);
+        ctx.rotate(pt.rot);
+        ctx.fillStyle = pt.c;
+        ctx.fillRect(-pt.w / 2, -pt.h / 2, pt.w, pt.h);
+        ctx.restore();
+      });
+      if (Date.now() - start < duration) requestAnimationFrame(frame);
+      else { ctx.clearRect(0, 0, cv.width, cv.height); cv.style.display = 'none'; }
+    })();
+  }
+
   function finishPractice() {
     var total = state.queue.length;
     var score = total ? Math.round(state.score / total * 100) : 0;
@@ -553,6 +687,35 @@
     else if (score >= 60) { emoji = '👍'; title = '不错，再练一轮会更好'; }
     $('resultEmoji').textContent = emoji;
     $('resultTitle').textContent = title;
+
+    // ---- v2：一轮结算（徽章 + 激励展示 + 庆祝） ----
+    var p = AP();
+    var perfect = (total > 0 && state.score === total);
+    var nb = EngStore.recordRound(p, total, state.score, perfect);
+    persist();
+
+    var box = $('rewardBox');
+    if (state.roundGained > 0 || state.roundGoalDone || nb.length) {
+      box.style.display = 'block';
+      $('rewardPts').textContent = '本轮 +' + state.roundGained + ' 分';
+      var parts = [];
+      if (state.roundGoalDone) parts.push('🎉 <b>今日任务达成！</b>');
+      nb.forEach(function (id) {
+        var b = EngStore.badgeById(id);
+        parts.push('<span class="new-badge">' + b.icon + ' 获得新徽章「' + b.name + '」</span>');
+      });
+      var lv = EngStore.levelOf(p.stats.points);
+      parts.push('当前等级：' + lv.cur.icon + ' ' + lv.cur.name + ' · ' + p.stats.points + ' 分');
+      $('rewardDetail').innerHTML = parts.join('<br>');
+      if (state.roundGoalDone || perfect) {
+        confetti(2200);
+        if (SPCFG().enabled) {
+          speak(perfect ? 'Perfect! You are amazing!' : 'Great! Daily goal completed!', null, { forEnglish: true });
+        }
+      }
+    } else {
+      box.style.display = 'none';
+    }
 
     var list = $('wrongList');
     if (!state.wrong.length) {
@@ -569,6 +732,37 @@
     goto('result');
   }
 
+  /* ---------- 麦克风语音作答 ---------- */
+  function bindMic() {
+    $('micBtn').addEventListener('click', function () {
+      if (EngSpeech.isRecognizing()) {
+        EngSpeech.stopRecognize();
+        return;
+      }
+      var q = state.queue[state.idx];
+      if (!q) return;
+      var lang = (q.mode === 'en2zh') ? 'zh-CN' : 'en-US';
+      var btn = this;
+      btn.classList.add('recording');
+      btn.textContent = '🔴 正在聆听… 点此结束';
+      $('micHint').textContent = '';
+      EngSpeech.startRecognize({
+        lang: lang,
+        onresult: function (text, isFinal) {
+          if (text) $('answerInput').value = text;
+          if (isFinal) $('micHint').textContent = '✅ 已识别，请核对后提交';
+        },
+        onerror: function (msg) {
+          $('micHint').textContent = '⚠️ ' + msg;
+        },
+        onend: function () {
+          btn.classList.remove('recording');
+          btn.textContent = q.mode === 'en2zh' ? '🎙️ 说中文（语音作答）' : '🎙️ 说英文（语音作答）';
+        }
+      });
+    });
+  }
+
   function bindPractice() {
     $('submitBtn').addEventListener('click', submitAnswer);
     $('skipBtn').addEventListener('click', skipQuestion);
@@ -578,20 +772,199 @@
       if (q) speak(q.en, this);
     });
     $('quitBtn').addEventListener('click', function () {
-      if (confirm('确定退出本次练习吗？当前进度不会保存。')) goto('home');
+      if (confirm('确定退出本次练习吗？已答题目仍会计入学习进度。')) goto('home');
     });
     $('againBtn').addEventListener('click', function () { startPractice(); });
-    // 回车提交（单行场景友好）
     $('answerInput').addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey && !state.answered) {
         e.preventDefault();
         submitAnswer();
       }
     });
+    bindMic();
   }
 
   /* ============================================================
-     九、题库管理
+     十、我的学习（等级 / 打卡 / 趋势 / 徽章 / 规划）
+     ============================================================ */
+  function renderPlan() {
+    var p = AP();
+    $('plAvatar').textContent = p.avatar;
+    $('plName').textContent = p.name;
+    var lv = EngStore.levelOf(p.stats.points);
+    $('plLevel').textContent = lv.cur.icon + ' ' + lv.cur.name + ' · ' + p.stats.points + ' 分';
+    $('lvIcon').textContent = lv.cur.icon;
+    $('lvName').textContent = lv.cur.name;
+    $('lvFill').style.width = Math.round(lv.ratio * 100) + '%';
+    $('lvNext').textContent = lv.next
+      ? '再练 ' + (lv.next.min - p.stats.points) + ' 分升级为「' + lv.next.name + '」'
+      : '已是最高等级，太厉害了！';
+    $('lvPts').innerHTML = p.stats.points + '<small>分</small>';
+    $('plStreak').textContent = '🔥 连续 ' + p.stats.streak + ' 天（最长 ' + p.stats.bestStreak + '）';
+
+    // 今日 / 目标 / 正确率 / 最长连击
+    var t = EngStore.todayStat(p);
+    $('stToday').textContent = t.done;
+    $('stGoal').textContent = p.plan.dailyGoal;
+    $('stAcc').textContent = EngStore.accuracy(p) + '%';
+    $('stBest').textContent = p.stats.bestStreak;
+
+    // 本周打卡条（周一为一周起点）
+    var days = EngStore.lastDays(p, 14);
+    var max = Math.max.apply(null, days.map(function (d) { return d.done; }).concat([p.plan.dailyGoal]));
+    $('miniChart').innerHTML = days.map(function (d) {
+      var h = max ? Math.round(d.done / max * 100) : 0;
+      var hit = d.done >= (+p.plan.dailyGoal || 10);
+      return '<div class="bar-col" title="' + d.key + '：' + d.done + ' 题">' +
+        '<div class="bar' + (hit ? ' hit' : '') + '" style="height:' + Math.max(4, h) + '%"></div>' +
+        '<span>' + d.key.slice(8) + '</span></div>';
+    }).join('');
+
+    // 徽章墙
+    var badges = EngStore.BADGES;
+    $('badgeCount').textContent = p.stats.badges.length + '/' + badges.length;
+    $('badgeGrid').innerHTML = badges.map(function (b) {
+      var got = p.stats.badges.indexOf(b.id) > -1;
+      return '<div class="badge-cell' + (got ? ' got' : '') + '" title="' + b.desc + '">' +
+        '<span class="b-icon">' + b.icon + '</span>' +
+        '<span class="b-name">' + b.name + '</span>' +
+        '</div>';
+    }).join('');
+
+    // 规划表单
+    $('planGoal').value = String(p.plan.dailyGoal);
+    syncHomeSelect();
+    $('planBank').value = p.plan.bankId || '__all__';
+    document.querySelectorAll('#planModes input').forEach(function (cb) {
+      cb.checked = (p.plan.modes || []).indexOf(cb.value) > -1;
+    });
+    document.querySelectorAll('#planDays input').forEach(function (cb) {
+      cb.checked = (p.plan.weekdays || []).indexOf(+cb.value) > -1;
+    });
+  }
+
+  function bindPlan() {
+    $('plSwitchBtn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      renderProfileMenu();
+      $('profileMenu').style.display = 'block';
+    });
+    $('planSaveBtn').addEventListener('click', function () {
+      var p = AP();
+      p.plan.dailyGoal = parseInt($('planGoal').value, 10) || 10;
+      p.plan.bankId = $('planBank').value || '__all__';
+      var modes = [];
+      document.querySelectorAll('#planModes input:checked').forEach(function (cb) { modes.push(cb.value); });
+      if (!modes.length) { alert('请至少选择一种练习题型。'); return; }
+      p.plan.modes = modes;
+      var wds = [];
+      document.querySelectorAll('#planDays input:checked').forEach(function (cb) { wds.push(+cb.value); });
+      p.plan.weekdays = wds.length ? wds : [1, 2, 3, 4, 5, 6, 0];
+      persist();
+      applyPlanToHome();
+      renderTodayCard();
+      renderPlanHint();
+      showImpFb('ok', '✅ 学习规划已保存');
+      goto('manage');
+      setTimeout(function () {
+        var el = $('importFeedback');
+        el.className = 'feedback show ok';
+        el.textContent = '✅ 「' + p.name + '」的学习规划已更新。';
+      }, 60);
+    });
+  }
+
+  /* ============================================================
+     十一、成员管理
+     ============================================================ */
+  function renderProfileList() {
+    var wrap = $('profileList');
+    wrap.innerHTML = DATA.profiles.map(function (p) {
+      var t = EngStore.todayStat(p);
+      var lv = EngStore.levelOf(p.stats.points);
+      var active = p.id === DATA.activeProfileId;
+      return '<div class="prof-item' + (active ? ' active' : '') + '" data-pid="' + p.id + '">' +
+        '<span class="prof-avatar">' + p.avatar + '</span>' +
+        '<div class="prof-mid">' +
+        '<b>' + escapeHtml(p.name) + (active ? ' <em class="cur-tag">当前</em>' : '') + '</b>' +
+        '<small>' + (p.type === 'kid' ? '小朋友' : '大人') + ' · ' + lv.cur.icon + lv.cur.name + ' · ⭐' + p.stats.points +
+        ' · 🔥' + p.stats.streak + ' 天 · 今日 ' + t.done + '/' + p.plan.dailyGoal + '</small>' +
+        '</div>' +
+        '<div class="prof-ops">' +
+        (active ? '' : '<button class="btn btn-ghost" data-use="' + p.id + '">使用</button>') +
+        '<button class="btn btn-ghost" data-edit="' + p.id + '">编辑</button>' +
+        '<button class="btn btn-ghost" data-del="' + p.id + '">删除</button>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+
+    wrap.querySelectorAll('[data-use]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        DATA.activeProfileId = b.getAttribute('data-use');
+        persist();
+        renderProfileChip();
+        renderProfileList();
+        applyPlanToHome();
+        renderTodayCard();
+      });
+    });
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        openProfileEditor(EngStore.findProfile(DATA, b.getAttribute('data-edit')));
+      });
+    });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var p = EngStore.findProfile(DATA, b.getAttribute('data-del'));
+        if (!p) return;
+        if (!confirm('确定删除成员「' + p.name + '」吗？\n其学习进度与徽章将一并删除，题库不受影响。')) return;
+        EngStore.removeProfile(DATA, p.id);
+        persist();
+        renderProfileChip();
+        renderProfileList();
+        applyPlanToHome();
+        renderTodayCard();
+      });
+    });
+  }
+
+  function openProfileEditor(profile) {
+    var isNew = !profile;
+    var name = prompt(isNew ? '新成员的名字：' : '修改名字：', isNew ? '' : profile.name);
+    if (name === null) return;
+    name = String(name).trim();
+    if (!name) { alert('名字不能为空。'); return; }
+    var typeInput = prompt('成员类型（输入 1 = 小朋友，2 = 大人）：', isNew ? '1' : (profile.type === 'kid' ? '1' : '2'));
+    if (typeInput === null) return;
+    var type = String(typeInput).trim() === '1' ? 'kid' : 'adult';
+    var av = prompt('头像（可输入一个 emoji，如 🧒👧🦊🐯）：', isNew ? (type === 'kid' ? '🧒' : '🙂') : profile.avatar);
+    if (av === null) av = null;
+    var goal = prompt('每日目标题数：', isNew ? (type === 'kid' ? '15' : '20') : String(profile.plan.dailyGoal));
+    var goalN = Math.max(1, Math.min(200, parseInt(goal, 10) || (type === 'kid' ? 15 : 20)));
+
+    if (isNew) {
+      var p = EngStore.addProfile(DATA, name, type, (av || '').trim() || (type === 'kid' ? '🧒' : '🙂'), goalN);
+      DATA.activeProfileId = p.id;
+    } else {
+      profile.name = name;
+      profile.type = type;
+      if ((av || '').trim()) profile.avatar = av.trim();
+      profile.plan.dailyGoal = goalN;
+      if (type === 'kid' && profile.plan.modes.indexOf('listen') < 0) profile.plan.modes.push('listen');
+    }
+    persist();
+    renderProfileChip();
+    renderProfileList();
+    applyPlanToHome();
+    renderTodayCard();
+  }
+
+  function bindProfileView() {
+    $('profAddBtn').addEventListener('click', function () { openProfileEditor(null); });
+  }
+
+  /* ============================================================
+     十二、题库管理（v1 全部保留 + 备份含成员进度）
      ============================================================ */
   function renderManage() {
     if (!DATA.banks.length) DATA.banks.push({ id: uid('bank'), name: '新题库', items: [] });
@@ -610,7 +983,7 @@
       ? '当前题库：' + bank.name + ' · 共 ' + bank.items.length + ' 道题'
       : '';
     renderQList();
-    refreshVoiceList();
+    refreshVoiceUI();
   }
 
   function renderQList() {
@@ -629,7 +1002,6 @@
       list.innerHTML = '<div class="empty">' + (kw ? '没有匹配的题目' : '题库还是空的，用上面的导入或手动录入添加吧') + '</div>';
       return;
     }
-    // 最多渲染 300 条，避免超长列表卡顿
     var shown = items.slice(0, 300);
     list.innerHTML = shown.map(function (it) {
       var idx = bank.items.indexOf(it);
@@ -656,27 +1028,12 @@
     });
   }
 
-  function syncHomeSelect() {
-    var sel = $('bankSelect');
-    var cur = state.bankId;
-    sel.innerHTML = '<option value="__all__">全部题库（随机抽题）</option>' +
-      DATA.banks.map(function (b) {
-        return '<option value="' + b.id + '">' + escapeHtml(b.name) + '（' + b.items.length + ' 题）</option>';
-      }).join('');
-    if (cur && (cur === '__all__' || findBank(cur))) sel.value = cur;
-    else { state.bankId = '__all__'; sel.value = '__all__'; }
-    updateBankMeta();
-  }
-
-  /* ---------- 解析导入文本 ---------- */
   function parseLines(text) {
     var out = [];
     String(text).split(/\r?\n/).forEach(function (line) {
       var l = line.trim();
       if (!l) return;
-      // 跳过表头
       if (/^(中文|english|英文|chinese)\s*[|,，\t]/i.test(l)) return;
-      // 优先竖线，其次制表符，最后中英文逗号
       var parts = l.split(/\s*\|\s*/);
       if (parts.length < 2) parts = l.split(/\t/);
       if (parts.length < 2) parts = l.split(/[,，]/);
@@ -707,14 +1064,18 @@
     return { added: added, dup: dup };
   }
 
+  function showImpFb(type, html) {
+    var el = $('importFeedback');
+    el.className = 'feedback show ' + type;
+    el.innerHTML = html;
+  }
+
   function bindManage() {
-    /* 题库选择 */
     $('manageBankSelect').addEventListener('change', function () {
       state.manageBankId = this.value;
       renderManage();
     });
 
-    /* 新建题库 */
     $('addBankBtn').addEventListener('click', function () {
       var name = prompt('新题库名称：', '我的题库 ' + (DATA.banks.length + 1));
       if (!name) return;
@@ -726,7 +1087,6 @@
       syncHomeSelect();
     });
 
-    /* 重命名 */
     $('renameBankBtn').addEventListener('click', function () {
       var b = findBank(state.manageBankId);
       if (!b) return;
@@ -738,7 +1098,6 @@
       syncHomeSelect();
     });
 
-    /* 删除题库 */
     $('delBankBtn').addEventListener('click', function () {
       if (DATA.banks.length <= 1) {
         alert('至少要保留一个题库。');
@@ -754,7 +1113,6 @@
       syncHomeSelect();
     });
 
-    /* 导入 Tab */
     document.querySelectorAll('.tab').forEach(function (t) {
       t.addEventListener('click', function () {
         state.impTab = t.getAttribute('data-imp');
@@ -766,7 +1124,6 @@
       });
     });
 
-    /* 文件选择 */
     $('fileInput').addEventListener('change', function () {
       var f = this.files && this.files[0];
       if (!f) { state.fileItems = null; return; }
@@ -802,7 +1159,6 @@
       reader.readAsText(f, 'utf-8');
     });
 
-    /* 执行导入 */
     $('doImportBtn').addEventListener('click', function () {
       var items;
       if (state.impTab === 'text') {
@@ -823,7 +1179,6 @@
       syncHomeSelect();
     });
 
-    /* 清空题目 */
     $('clearBankBtn').addEventListener('click', function () {
       var b = findBank(state.manageBankId);
       if (!b || !b.items.length) return;
@@ -834,7 +1189,6 @@
       syncHomeSelect();
     });
 
-    /* 手动录入 */
     $('manAddBtn').addEventListener('click', function () {
       var zh = $('manZh').value.trim();
       var en = $('manEn').value.trim();
@@ -858,16 +1212,17 @@
       if (e.key === 'Enter') { e.preventDefault(); $('manEn').focus(); }
     });
 
-    /* 搜索 */
     $('qSearch').addEventListener('input', renderQList);
 
-    /* 导出 */
+    /* 导出（v2：含成员与进度） */
     $('exportBtn').addEventListener('click', function () {
       var payload = {
         version: DATA.version,
         exportedAt: new Date().toISOString(),
         config: DATA.config,
-        banks: DATA.banks
+        banks: DATA.banks,
+        profiles: DATA.profiles,
+        activeProfileId: DATA.activeProfileId
       };
       var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
       var url = URL.createObjectURL(blob);
@@ -875,15 +1230,15 @@
       var d = new Date();
       var stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
       a.href = url;
-      a.download = '英语陪练-题库备份-' + stamp + '.json';
+      a.download = '英语陪练-备份-' + stamp + '.json';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-      showImpFb('ok', '✅ 备份已导出，请妥善保存该 JSON 文件。');
+      showImpFb('ok', '✅ 备份已导出（含题库 + 全部成员进度），请妥善保存该 JSON 文件。');
     });
 
-    /* 导入 JSON 备份 */
+    /* 导入 JSON 备份（v2 兼容 v1 备份） */
     $('importJsonBtn').addEventListener('click', function () { $('jsonInput').click(); });
     $('jsonInput').addEventListener('change', function () {
       var f = this.files && this.files[0];
@@ -894,25 +1249,25 @@
         try {
           var d = JSON.parse(String(e.target.result || ''));
           if (!d || !Array.isArray(d.banks)) throw new Error('格式不正确');
-          if (!confirm('导入将覆盖当前全部题库与设置，确定继续吗？')) { self.value = ''; return; }
+          if (!confirm('导入将覆盖当前全部题库、成员与进度，确定继续吗？')) { self.value = ''; return; }
           DATA = {
-            version: 1,
-            config: Object.assign({}, DEFAULT_DATA.config, d.config || {}),
-            banks: d.banks
+            version: 2,
+            activeProfileId: d.activeProfileId || null,
+            config: Object.assign(EngStore.clone(EngStore.DEFAULT_CONFIG), d.config || {}),
+            banks: d.banks,
+            profiles: Array.isArray(d.profiles) && d.profiles.length ? d.profiles : EngStore.defaultProfiles()
           };
-          DATA.banks.forEach(function (b) {
-            if (!b.id) b.id = uid('bank');
-            if (!Array.isArray(b.items)) b.items = [];
-            b.items = b.items.map(function (it) {
-              return { zh: String(it.zh || '').trim(), en: String(it.en || '').trim() };
-            }).filter(function (it) { return it.zh && it.en; });
-          });
+          EngStore.normalize(DATA);
           persist();
           applyConfig();
+          loadSpeechUI();
+          renderProfileChip();
           state.manageBankId = DATA.banks.length ? DATA.banks[0].id : null;
           renderManage();
           syncHomeSelect();
-          showImpFb('ok', '✅ 备份导入成功，共 ' + DATA.banks.length + ' 个题库。');
+          applyPlanToHome();
+          renderTodayCard();
+          showImpFb('ok', '✅ 备份导入成功：' + DATA.banks.length + ' 个题库，' + DATA.profiles.length + ' 个成员。');
         } catch (err) {
           showImpFb('bad', '❌ 导入失败：文件格式不正确。');
         }
@@ -923,14 +1278,19 @@
 
     /* 恢复默认 */
     $('resetBtn').addEventListener('click', function () {
-      if (!confirm('将恢复到内置的 3 个示例题库，你现有的题库和设置会被清空。\n确定继续吗？')) return;
-      DATA = store.reset();
+      if (!confirm('将恢复到内置示例题库，并清空全部成员的学习进度与设置。\n确定继续吗？（建议先导出备份）')) return;
+      DATA = defaultData();
+      EngStore.clear();
       persist();
       applyConfig();
+      loadSpeechUI();
+      renderProfileChip();
       state.manageBankId = DATA.banks[0].id;
       renderManage();
       syncHomeSelect();
-      showImpFb('ok', '✅ 已恢复默认题库。');
+      applyPlanToHome();
+      renderTodayCard();
+      showImpFb('ok', '✅ 已恢复默认题库与成员。');
     });
 
     /* 外观设置 */
@@ -942,60 +1302,110 @@
       DATA.config.logo = $('cfgLogo').value.trim() || '🎧';
       DATA.config.name = $('cfgName').value.trim() || '英语陪练';
       DATA.config.color = $('cfgColor').value;
-      DATA.config.voice = $('cfgVoice').value;
       persist();
       applyConfig();
       showImpFb('ok', '✅ 外观设置已保存，前端刷新后生效。');
     });
-  }
 
-  function showImpFb(type, html) {
-    var el = $('importFeedback');
-    el.className = 'feedback show ' + type;
-    el.innerHTML = html;
-  }
+    /* ---- 语音设置 ---- */
+    var rate = $('spRate'), pitch = $('spPitch');
+    rate.addEventListener('input', function () { $('spRateVal').textContent = (+this.value).toFixed(2); });
+    pitch.addEventListener('input', function () { $('spPitchVal').textContent = (+this.value).toFixed(1); });
 
-  function refreshVoiceList() {
-    var sel = $('cfgVoice');
-    if (!sel) return;
-    if (!('speechSynthesis' in window)) {
-      sel.innerHTML = '<option value="">当前浏览器不支持语音</option>';
-      return;
-    }
-    var voices = window.speechSynthesis.getVoices().filter(function (v) {
-      return /^en/i.test(v.lang);
+    $('spTestBtn').addEventListener('click', function () {
+      EngSpeech.test({
+        enabled: true,
+        rate: +rate.value,
+        pitch: +pitch.value,
+        volume: 1,
+        repeat: 1,
+        voiceName: $('spVoice').value
+      }, 'Hello! This is a voice test. Nice to meet you.');
     });
+
+    $('spSaveBtn').addEventListener('click', function () {
+      var s = DATA.config.speech;
+      s.enabled = $('spEnabled').checked;
+      s.readPrompt = $('spReadPrompt').checked;
+      s.readAnswer = $('spReadAnswer').checked;
+      s.readFeedback = $('spReadFeedback').checked;
+      s.recognize = $('spRecognize').checked;
+      s.rate = +rate.value;
+      s.pitch = +pitch.value;
+      s.repeat = parseInt($('spRepeat').value, 10) || 1;
+      s.voiceName = $('spVoice').value;
+      persist();
+      showImpFb('ok', '✅ 语音设置已保存，下轮练习即生效。');
+    });
+  }
+
+  /* 语音设置 UI 载入 + 支持情况提示 */
+  function loadSpeechUI() {
+    var s = SPCFG();
+    $('spEnabled').checked = !!s.enabled;
+    $('spReadPrompt').checked = !!s.readPrompt;
+    $('spReadAnswer').checked = !!s.readAnswer;
+    $('spReadFeedback').checked = !!s.readFeedback;
+    $('spRecognize').checked = !!s.recognize;
+    $('spRate').value = s.rate;
+    $('spRateVal').textContent = (+s.rate).toFixed(2);
+    $('spPitch').value = s.pitch;
+    $('spPitchVal').textContent = (+s.pitch).toFixed(1);
+    $('spRepeat').value = String(s.repeat || 1);
+
+    var hint = $('spSupportHint');
+    var tips = [];
+    if (!EngSpeech.supported) tips.push('当前浏览器不支持语音朗读（建议 Chrome / Edge / Safari）。');
+    if (!EngSpeech.recogSupported) tips.push('当前浏览器不支持语音识别作答（Chrome / Edge / 安卓浏览器支持）。');
+    if (!tips.length) tips.push('本设备支持语音朗读' + (EngSpeech.recogSupported ? '与语音识别作答' : '') + '。语音识别需要联网并允许麦克风权限。');
+    hint.textContent = tips.join(' ');
+
+    refreshVoiceUI();
+  }
+
+  function refreshVoiceUI() {
+    var sel = $('spVoice');
+    if (!sel) return;
+    var cur = SPCFG().voiceName || '';
+    var voices = EngSpeech.englishVoices();
     if (!voices.length) {
       sel.innerHTML = '<option value="">自动（英语女声优先）</option>';
       return;
     }
     sel.innerHTML = '<option value="">自动（英语女声优先）</option>' +
       voices.map(function (v) {
-        var label = v.name + ' · ' + v.lang;
-        return '<option value="' + escapeHtml(v.name) + '"' +
-          (DATA.config.voice === v.name ? ' selected' : '') + '>' + escapeHtml(label) + '</option>';
+        return '<option value="' + escapeHtml(v.name) + '"' + (v.name === cur ? ' selected' : '') + '>' +
+          escapeHtml(v.name + ' · ' + v.lang) + '</option>';
       }).join('');
   }
 
   /* ============================================================
-     十、启动
+     十三、启动
      ============================================================ */
   function init() {
     applyConfig();
+    renderProfileChip();
+    bindProfileChip();
+    bindProfileView();
     initHome();
     bindPractice();
     bindManage();
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = refreshVoiceList;
-      refreshVoiceList();
+    bindPlan();
+    loadSpeechUI();
+    renderTodayCard();
+    renderPlanHint();
+
+    if (EngSpeech.supported) EngSpeech.loadVoices();
+
+    // hash 路由：#admin → 题库后台；#plan → 我的学习；#profile → 成员管理
+    function route() {
+      var h = (location.hash || '').replace('#', '').toLowerCase();
+      if (h === 'admin' || h === 'manage') goto('manage');
+      else if (h === 'plan') goto('plan');
+      else if (h === 'profile') goto('profile');
     }
-    // URL hash 路由：#admin / #manage 直达后台管理页，用于独立后台地址
-    var h = (location.hash || '').replace('#', '').toLowerCase();
-    if (h === 'admin' || h === 'manage') goto('manage');
-    window.addEventListener('hashchange', function () {
-      var hh = (location.hash || '').replace('#', '').toLowerCase();
-      if (hh === 'admin' || hh === 'manage') goto('manage');
-    });
+    route();
+    window.addEventListener('hashchange', route);
   }
 
   if (document.readyState === 'loading') {
@@ -1004,6 +1414,5 @@
     init();
   }
 
-  // 暴露给调试用
-  window.__engTrainer = { DATA: DATA, state: state };
+  window.__engTrainer = { DATA: DATA, state: state, EngStore: EngStore, EngSpeech: EngSpeech };
 })();

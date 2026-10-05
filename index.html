@@ -4,7 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#2563EB">
+<meta name="description" content="适合小学生和成人的中英互译默写练习工具，支持自定义题库、听力朗读、学习规划与离线使用。">
 <title>英语陪练 · 中英默写练习</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="英语陪练">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -16,10 +25,23 @@
       <span class="brand-logo" id="brandLogo">🎧</span>
       <span class="brand-name" id="brandName">英语陪练</span>
     </div>
-    <nav class="topnav">
-      <button class="navbtn active" data-view="home">开始练习</button>
-      <button class="navbtn" data-view="manage">题库管理</button>
-    </nav>
+    <div class="topnav">
+      <!-- 成员切换器 -->
+      <button class="profile-chip" id="profileChip" title="切换成员">
+        <span id="chipAvatar">🧒</span>
+        <span id="chipName">小朋友</span>
+        <span class="chip-caret">▾</span>
+      </button>
+      <button class="navbtn active" data-view="home">练习</button>
+      <button class="navbtn" data-view="plan">我的学习</button>
+      <button class="navbtn" data-view="manage">题库</button>
+    </div>
+  </div>
+  <!-- 成员下拉面板 -->
+  <div class="profile-menu" id="profileMenu" style="display:none">
+    <div class="pm-title">选择成员</div>
+    <div id="pmList"></div>
+    <button class="pm-add" id="pmAddBtn">＋ 添加成员</button>
   </div>
 </header>
 
@@ -30,6 +52,28 @@
     <div class="hero">
       <h1 id="heroTitle">中英互译 · 陪练一下</h1>
       <p class="hero-sub" id="heroSub">选好模式和题包，马上开始。手机、平板、电脑都能用。</p>
+    </div>
+
+    <!-- 今日任务卡（当前成员） -->
+    <div class="card today-card" id="todayCard">
+      <div class="today-left">
+        <div class="today-title" id="todayTitle">今日任务</div>
+        <div class="today-num" id="todayNum">0 / 15 题</div>
+        <div class="today-hint" id="todayHint">开始第一题吧！</div>
+      </div>
+      <div class="today-right">
+        <div class="ring">
+          <svg viewBox="0 0 72 72" class="ring-svg">
+            <circle class="ring-bg" cx="36" cy="36" r="30"/>
+            <circle class="ring-fg" id="ringFg" cx="36" cy="36" r="30"/>
+          </svg>
+          <span class="ring-text" id="ringText">0%</span>
+        </div>
+      </div>
+      <div class="today-meta">
+        <span id="todayStreak">🔥 连续 0 天</span>
+        <span id="todayPoints">⭐ 0 分</span>
+      </div>
     </div>
 
     <div class="card">
@@ -56,6 +100,7 @@
           <span class="mode-desc">三种题型随机出</span>
         </button>
       </div>
+      <p class="hint" id="planModeHint"></p>
     </div>
 
     <div class="card">
@@ -81,11 +126,13 @@
         </label>
       </div>
       <button class="btn btn-primary btn-block" id="startBtn">🚀 开始练习</button>
+      <button class="btn btn-ghost btn-block" id="installBtn" style="display:none">📲 添加到主屏幕（像 App 一样用）</button>
+      <button class="btn btn-ghost btn-block" id="iosInstallTip" style="display:none">📲 iOS 安装方法</button>
     </div>
 
     <div class="card muted-card">
       <h2 class="card-title">没题可练？</h2>
-      <p class="hint">内置了小学基础、日常口语、职场英语三个示例题包。也可以到「题库管理」自己导入或手动添加。</p>
+      <p class="hint">内置了小学基础、日常口语、职场英语三个示例题包。也可以到「题库」自己导入或手动添加。每个成员的学习规划在「我的学习」里设置。</p>
       <button class="btn btn-ghost" data-view="manage">前往题库管理 →</button>
     </div>
   </section>
@@ -107,6 +154,11 @@
       <button class="btn btn-listen" id="speakBtn" style="display:none">🔊 再听一遍</button>
 
       <textarea class="answer-input" id="answerInput" rows="2" placeholder="在这里输入答案…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+
+      <div class="mic-row" id="micRow" style="display:none">
+        <button class="btn btn-mic" id="micBtn">🎙️ 按住说话，松开识别</button>
+        <span class="mic-hint" id="micHint"></span>
+      </div>
 
       <div class="feedback" id="feedback"></div>
 
@@ -130,15 +182,127 @@
         <span class="score-unit">分</span>
       </div>
       <p class="hint" id="resultMeta">答对 0 题 / 共 0 题</p>
-      <div class="btn-row">
-        <button class="btn btn-primary btn-grow" id="againBtn">再练一遍</button>
-        <button class="btn btn-ghost" data-view="home">返回首页</button>
+      <!-- 激励区 -->
+      <div class="reward-box" id="rewardBox" style="display:none">
+        <div class="reward-pts" id="rewardPts">+0 分</div>
+        <div class="reward-detail" id="rewardDetail"></div>
       </div>
     </div>
 
     <div class="card">
       <h2 class="card-title">错题回顾</h2>
       <div id="wrongList" class="wrong-list"></div>
+    </div>
+
+    <div class="btn-row result-actions">
+      <button class="btn btn-primary btn-grow" id="againBtn">再练一遍</button>
+      <button class="btn btn-ghost" data-view="plan">看我的学习 →</button>
+    </div>
+  </section>
+
+  <!-- ============ 我的学习（规划/进度/激励） ============ -->
+  <section class="view" id="view-plan">
+    <div class="hero plan-hero">
+      <div class="plan-avatar" id="plAvatar">🧒</div>
+      <div class="plan-head-mid">
+        <h1 id="plName">小朋友</h1>
+        <p class="hero-sub" id="plLevel">🌱 英语新芽 · 0 分</p>
+      </div>
+      <button class="btn btn-ghost" id="plSwitchBtn">切换成员</button>
+    </div>
+
+    <!-- 等级进度 -->
+    <div class="card">
+      <div class="level-row">
+        <span class="level-icon" id="lvIcon">🌱</span>
+        <div class="level-mid">
+          <div class="level-name" id="lvName">英语新芽</div>
+          <div class="level-bar"><div class="level-fill" id="lvFill"></div></div>
+          <div class="level-next" id="lvNext">还差 100 分升级</div>
+        </div>
+        <div class="level-pts" id="lvPts">0<small>分</small></div>
+      </div>
+    </div>
+
+    <!-- 本周打卡 -->
+    <div class="card">
+      <h2 class="card-title">本周打卡 <span class="streak-chip" id="plStreak">🔥 连续 0 天</span></h2>
+      <div class="week-row" id="weekRow"></div>
+      <div class="stat-grid">
+        <div class="stat-box"><b id="stToday">0</b><span>今日已练</span></div>
+        <div class="stat-box"><b id="stGoal">15</b><span>每日目标</span></div>
+        <div class="stat-box"><b id="stAcc">0%</b><span>总正确率</span></div>
+        <div class="stat-box"><b id="stBest">0</b><span>最长连击</span></div>
+      </div>
+      <div class="mini-chart" id="miniChart"></div>
+      <p class="hint">最近 14 天每日练习量</p>
+    </div>
+
+    <!-- 徽章墙 -->
+    <div class="card">
+      <h2 class="card-title">我的徽章 <span class="badge" id="badgeCount">0/11</span></h2>
+      <div class="badge-grid" id="badgeGrid"></div>
+    </div>
+
+    <!-- 学习规划 -->
+    <div class="card">
+      <h2 class="card-title">学习规划</h2>
+      <p class="hint">为当前成员制定每日计划，完成后自动打卡并发放奖励。</p>
+      <div class="row2">
+        <label class="field">
+          <span class="field-label">每日目标（题）</span>
+          <select class="select" id="planGoal">
+            <option value="5">5 题 · 轻松</option>
+            <option value="10">10 题 · 日常</option>
+            <option value="15">15 题 · 标准</option>
+            <option value="20">20 题 · 进阶</option>
+            <option value="30">30 题 · 强化</option>
+            <option value="50">50 题 · 特训</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">练习题库</span>
+          <select class="select" id="planBank"></select>
+        </label>
+      </div>
+      <div class="field">
+        <span class="field-label">每日练习题型（至少一种）</span>
+        <div class="check-row" id="planModes">
+          <label class="chk"><input type="checkbox" value="zh2en"> 中译英</label>
+          <label class="chk"><input type="checkbox" value="en2zh"> 英译中</label>
+          <label class="chk"><input type="checkbox" value="listen"> 听力</label>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">练习日（星期）</span>
+        <div class="check-row" id="planDays">
+          <label class="chk"><input type="checkbox" value="1"> 一</label>
+          <label class="chk"><input type="checkbox" value="2"> 二</label>
+          <label class="chk"><input type="checkbox" value="3"> 三</label>
+          <label class="chk"><input type="checkbox" value="4"> 四</label>
+          <label class="chk"><input type="checkbox" value="5"> 五</label>
+          <label class="chk"><input type="checkbox" value="6"> 六</label>
+          <label class="chk"><input type="checkbox" value="0"> 日</label>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="planSaveBtn">保存学习规划</button>
+    </div>
+  </section>
+
+  <!-- ============ 成员管理 ============ -->
+  <section class="view" id="view-profile">
+    <div class="hero">
+      <h1>成员管理</h1>
+      <p class="hero-sub">给家里每个人建一个档案，学习进度、规划、激励各自独立。</p>
+    </div>
+    <div class="card">
+      <h2 class="card-title">成员列表</h2>
+      <div id="profileList" class="profile-list"></div>
+      <button class="btn btn-primary btn-block" id="profAddBtn">＋ 添加成员</button>
+    </div>
+    <div class="card muted-card">
+      <h2 class="card-title">怎么用？</h2>
+      <p class="hint">点顶部头像可快速切换成员；每个成员独立记录积分、打卡、错题风格与规划。小朋友建议选「小朋友」类型，默认开启宽松判分和慢速朗读。</p>
     </div>
   </section>
 
@@ -210,13 +374,55 @@
 
     <div class="card">
       <h2 class="card-title">备份与迁移</h2>
-      <p class="hint">换设备时：在这里导出 JSON 题库文件，在另一台设备导入即可。</p>
+      <p class="hint">换设备时：在这里导出 JSON 题库文件，在另一台设备导入即可。备份同时包含全部成员的学习进度。</p>
       <div class="btn-row wrap-row">
-        <button class="btn btn-primary" id="exportBtn">⬇ 导出全部题库</button>
+        <button class="btn btn-primary" id="exportBtn">⬇ 导出全部数据</button>
         <button class="btn btn-ghost" id="importJsonBtn">⬆ 导入 JSON 备份</button>
         <button class="btn btn-ghost" id="resetBtn">恢复默认题库</button>
       </div>
       <input type="file" id="jsonInput" accept=".json" style="display:none">
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">语音设置</h2>
+      <div class="check-row" id="spToggles">
+        <label class="chk"><input type="checkbox" id="spEnabled"> 开启语音朗读</label>
+        <label class="chk"><input type="checkbox" id="spReadPrompt"> 出题后自动读题</label>
+        <label class="chk"><input type="checkbox" id="spReadAnswer"> 判分后读正确答案</label>
+        <label class="chk"><input type="checkbox" id="spReadFeedback"> 判分后读对错提示</label>
+        <label class="chk"><input type="checkbox" id="spRecognize"> 允许麦克风语音作答</label>
+      </div>
+      <div class="row2">
+        <label class="field">
+          <span class="field-label">语速 <b id="spRateVal">0.85</b></span>
+          <input type="range" id="spRate" min="0.5" max="1.5" step="0.05" value="0.85" class="range">
+        </label>
+        <label class="field">
+          <span class="field-label">音调 <b id="spPitchVal">1.0</b></span>
+          <input type="range" id="spPitch" min="0.5" max="1.5" step="0.05" value="1" class="range">
+        </label>
+      </div>
+      <div class="row2">
+        <label class="field">
+          <span class="field-label">重复朗读次数</span>
+          <select class="select" id="spRepeat">
+            <option value="1">1 次</option>
+            <option value="2">2 次</option>
+            <option value="3">3 次（听力加强）</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">朗读语音</span>
+          <select class="select" id="spVoice">
+            <option value="">自动（英语女声优先）</option>
+          </select>
+        </label>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="spTestBtn">🔊 试听一下</button>
+        <button class="btn btn-primary btn-grow" id="spSaveBtn">保存语音设置</button>
+      </div>
+      <p class="hint" id="spSupportHint"></p>
     </div>
 
     <div class="card">
@@ -238,12 +444,6 @@
           <span class="hint" id="cfgColorText">#2563EB</span>
         </div>
       </label>
-      <div class="field">
-        <span class="field-label">首选语音</span>
-        <select class="select" id="cfgVoice">
-          <option value="">自动（英语女声优先）</option>
-        </select>
-      </div>
       <button class="btn btn-primary btn-block" id="saveCfgBtn">保存设置</button>
     </div>
   </section>
@@ -251,9 +451,72 @@
 </main>
 
 <footer class="foot">
-  <span>英语陪练 v1.0 · 纯静态运行 · 数据保存在本机浏览器</span>
+  <span>英语陪练 v2.0 · PWA 离线可用 · 数据保存在本机浏览器</span>
 </footer>
 
+<!-- 新版本提示条 -->
+<div class="update-bar" id="updateBar" style="display:none">
+  <span>🎉 发现新版本</span>
+  <button class="btn btn-ghost" id="updateReloadBtn">刷新更新</button>
+</div>
+
+<!-- 撒花动画层 -->
+<canvas id="confetti" style="display:none;position:fixed;inset:0;pointer-events:none;z-index:999"></canvas>
+
+<script src="assets/js/store.js"></script>
+<script src="assets/js/speech.js"></script>
 <script src="assets/js/app.js"></script>
+<script>
+/* ============ PWA：Service Worker 注册 + 安装引导 ============ */
+(function () {
+  if ('serviceWorker' in navigator && location.protocol === 'https:' || location.hostname === 'localhost') {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        reg.addEventListener('updatefound', function () {
+          var nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', function () {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              var bar = document.getElementById('updateBar');
+              if (bar) bar.style.display = 'flex';
+            }
+          });
+        });
+      }).catch(function (e) { console.warn('[PWA] SW 注册失败', e); });
+    });
+  }
+  document.getElementById('updateReloadBtn').addEventListener('click', function () {
+    location.reload(true);
+  });
+
+  /* 安装引导（Android/桌面 Chrome） */
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    var b = document.getElementById('installBtn');
+    var standalone = window.matchMedia('(display-mode: standalone)').matches;
+    if (b && !standalone) b.style.display = 'block';
+  });
+  document.getElementById('installBtn').addEventListener('click', function () {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function () {
+      deferredPrompt = null;
+      this.style.display = 'none';
+    }.bind(this));
+  });
+
+  /* iOS 引导（Safari 无 beforeinstallprompt） */
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isIOS && !standalone) {
+    document.getElementById('iosInstallTip').style.display = 'block';
+    document.getElementById('iosInstallTip').addEventListener('click', function () {
+      alert('iOS 安装方法：\n1. 用 Safari 打开本页\n2. 点底部「分享」按钮\n3. 选择「添加到主屏幕」\n\n添加后即可像 App 一样全屏使用，并支持离线练习。');
+    });
+  }
+})();
+</script>
 </body>
 </html>
