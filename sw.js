@@ -7,7 +7,7 @@
    - 其余请求：网络优先并写入缓存
    修改版本号即可触发客户端更新。
    ============================================================ */
-var VERSION = 'eng-trainer-v2.0.0';
+var VERSION = 'eng-trainer-v2.1.0';
 var SHELL_CACHE = VERSION + '-shell';
 var RUNTIME_CACHE = VERSION + '-runtime';
 
@@ -18,8 +18,10 @@ var SHELL_FILES = [
   './admin.html',
   './manifest.json',
   './assets/css/style.css',
+  './assets/js/banks.js',
   './assets/js/store.js',
   './assets/js/speech.js',
+  './assets/js/hint.js',
   './assets/js/app.js',
   './icons/icon-192.png',
   './icons/icon-512.png',

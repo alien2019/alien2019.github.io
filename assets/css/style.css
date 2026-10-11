@@ -614,6 +614,49 @@ textarea.answer-input { resize: vertical; min-height: 64px; line-height: 1.5; }
   .new-badge { background: rgba(255,255,255,.12); color: #FDE68A; }
 }
 
+/* ============================================================
+   v2.1 提示功能
+   ============================================================ */
+.btn-hint {
+  display: block; width: 100%; margin-top: 10px;
+  background: var(--warn-soft, #FFFBEB); color: #B45309;
+  border: 1.5px solid #FDE68A;
+  font-size: 14px; font-weight: 600; padding: 10px 14px;
+}
+.btn-hint:hover:not(:disabled) { background: #FEF3C7; border-color: #F59E0B; }
+.btn-hint:disabled { opacity: .55; cursor: not-allowed; }
+
+.hint-box {
+  margin-top: 10px; padding: 12px 14px;
+  background: var(--warn-soft, #FFFBEB);
+  border: 1.5px dashed #FCD34D; border-radius: 12px;
+}
+.hb-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; color: #92400E; }
+.hb-tag {
+  font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  background: #FDE68A; color: #92400E;
+}
+.hb-mask {
+  margin: 8px 0 6px; font-size: 21px; font-weight: 800; letter-spacing: 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #B45309; word-break: break-all; line-height: 1.3;
+}
+.hb-tip { font-size: 14px; color: #78350F; font-weight: 600; }
+.hb-note { margin-top: 6px; font-size: 12.5px; color: #92400E; opacity: .9; }
+.w-hint { font-size: 11.5px; font-weight: 700; color: #B45309; background: #FEF3C7; padding: 1px 7px; border-radius: 999px; }
+.chk-block { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0; font-size: 13.5px; line-height: 1.5; }
+.chk-block input { margin-top: 2px; width: 17px; height: 17px; accent-color: var(--brand); flex-shrink: 0; }
+
+@media (prefers-color-scheme: dark) {
+  .btn-hint { background: rgba(245,158,11,.14); color: #FCD34D; border-color: rgba(245,158,11,.35); }
+  .hint-box { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.3); }
+  .hb-line, .hb-note { color: #FCD34D; }
+  .hb-tip { color: #FDE68A; }
+  .hb-mask { color: #FBBF24; }
+  .hb-tag { background: rgba(245,158,11,.25); color: #FDE68A; }
+  .w-hint { background: rgba(245,158,11,.2); color: #FCD34D; }
+}
+
 /* 打印：隐藏交互元素 */
 @media print {
   .topbar, .btn, .foot, .progress-wrap, .update-bar { display: none !important; }

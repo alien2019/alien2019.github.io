@@ -18,77 +18,16 @@
 
   /* ============================================================
      一、默认数据（题库 + v2 骨架）
+     ------------------------------------------------------------
+     默认题库已抽到独立配置文件：assets/js/banks.js（window.EngBanks）
+     换默认题库只需改那个文件，不用动本逻辑文件。
      ============================================================ */
-  var DEFAULT_BANKS = [
-    {
-      id: 'primary',
-      name: '小学基础 20 句',
-      items: [
-        { zh: '苹果', en: 'apple' },
-        { zh: '香蕉', en: 'banana' },
-        { zh: '橙子', en: 'orange' },
-        { zh: '学校', en: 'school' },
-        { zh: '老师', en: 'teacher' },
-        { zh: '学生', en: 'student' },
-        { zh: '书', en: 'book' },
-        { zh: '铅笔', en: 'pencil' },
-        { zh: '书包', en: 'schoolbag' },
-        { zh: '教室', en: 'classroom' },
-        { zh: '我是一名学生。', en: 'I am a student.' },
-        { zh: '这是我的书。', en: 'This is my book.' },
-        { zh: '我喜欢苹果。', en: 'I like apples.' },
-        { zh: '她是一名老师。', en: 'She is a teacher.' },
-        { zh: '你今天好吗？', en: 'How are you today?' },
-        { zh: '我很好，谢谢你。', en: 'I am fine, thank you.' },
-        { zh: '现在几点了？', en: 'What time is it now?' },
-        { zh: '我每天七点起床。', en: 'I get up at seven every day.' },
-        { zh: '我有一只猫。', en: 'I have a cat.' },
-        { zh: '今天是星期一。', en: 'Today is Monday.' }
-      ]
-    },
-    {
-      id: 'daily',
-      name: '日常口语 15 句',
-      items: [
-        { zh: '早上好', en: 'Good morning' },
-        { zh: '晚安', en: 'Good night' },
-        { zh: '见到你很高兴', en: 'Nice to meet you' },
-        { zh: '请问洗手间在哪里？', en: 'Where is the restroom?' },
-        { zh: '这个多少钱？', en: 'How much is this?' },
-        { zh: '太贵了', en: 'That is too expensive' },
-        { zh: '请再说一遍', en: 'Please say that again' },
-        { zh: '我听不懂', en: 'I do not understand' },
-        { zh: '你能说慢一点吗？', en: 'Could you speak more slowly?' },
-        { zh: '我想点一杯咖啡', en: 'I would like a cup of coffee' },
-        { zh: '买单，谢谢', en: 'The bill, please' },
-        { zh: '不客气', en: 'You are welcome' },
-        { zh: '对不起，我迟到了', en: 'Sorry, I am late' },
-        { zh: '祝你生日快乐', en: 'Happy birthday to you' },
-        { zh: '明天见', en: 'See you tomorrow' }
-      ]
-    },
-    {
-      id: 'business',
-      name: '职场英语 15 句',
-      items: [
-        { zh: '我们下周开个会吧。', en: 'Let us have a meeting next week.' },
-        { zh: '请查收附件。', en: 'Please find the attachment.' },
-        { zh: '我会尽快回复你。', en: 'I will get back to you as soon as possible.' },
-        { zh: '这个项目进展如何？', en: 'How is the project going?' },
-        { zh: '我们需要更多时间。', en: 'We need more time.' },
-        { zh: '感谢你的支持。', en: 'Thank you for your support.' },
-        { zh: '我对这个方案有疑问。', en: 'I have some questions about this proposal.' },
-        { zh: '请确认一下时间安排。', en: 'Please confirm the schedule.' },
-        { zh: '我们会按时交付。', en: 'We will deliver on time.' },
-        { zh: '这份报告需要修改。', en: 'This report needs revision.' },
-        { zh: '请把资料发给我。', en: 'Please send me the materials.' },
-        { zh: '我同意你的看法。', en: 'I agree with you.' },
-        { zh: '让我们确认一下细节。', en: 'Let us confirm the details.' },
-        { zh: '预算大约是多少？', en: 'What is the approximate budget?' },
-        { zh: '期待与您合作。', en: 'Looking forward to working with you.' }
-      ]
-    }
-  ];
+  var DEFAULT_BANKS = (function () {
+    var cfg = window.EngBanks;
+    if (cfg && Array.isArray(cfg.banks) && cfg.banks.length) return cfg.banks;
+    console.warn('[app] 未加载到 assets/js/banks.js，默认题库为空（可用后台导入题库）');
+    return [];
+  })();
 
   function defaultData() {
     return {
@@ -129,7 +68,8 @@
     impTab: 'text',
     fileItems: null,
     roundGained: 0,      // 本轮获得积分
-    roundGoalDone: false // 本轮中是否触发每日目标达成
+    roundGoalDone: false,// 本轮中是否触发每日目标达成
+    hintUsed: []         // v2.1：每题用了几次提示（下标与 queue 对应）
   };
 
   var MODE_LABEL = { zh2en: '中译英', en2zh: '英译中', listen: '听力朗读', mix: '混合模式' };
@@ -478,6 +418,7 @@
     state.wrong = [];
     state.roundGained = 0;
     state.roundGoalDone = false;
+    state.hintUsed = state.queue.map(function () { return 0; });   // v2.1 每题提示次数清零
     goto('practice');
     renderQuestion();
   }
@@ -524,6 +465,9 @@
       micRow.style.display = 'none';
     }
 
+    // ---- v2.1：提示区（新题重置） ----
+    resetHintBox();
+
     var input = $('answerInput');
     input.value = '';
     input.disabled = false;
@@ -549,6 +493,60 @@
     }
   }
 
+  /* ---------- v2.1：提示功能 ---------- */
+  function HCFG() { return DATA.config.hint || {}; }
+
+  /* 新题：隐藏提示区，恢复按钮 */
+  function resetHintBox() {
+    var cfg = HCFG();
+    var btn = $('hintBtn');
+    var box = $('hintBox');
+    if (btn) {
+      btn.style.display = (cfg.enabled === false) ? 'none' : '';
+      btn.textContent = '💡 给我点提示';
+      btn.disabled = false;
+    }
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  }
+
+  /* 点一次「给我点提示」→ 提示升级一档 */
+  function showHint() {
+    var q = state.queue[state.idx];
+    if (!q || state.answered) return;
+    var cfg = HCFG();
+    var max = Math.max(1, Math.min(3, +cfg.maxLevel || 3));
+    var used = state.hintUsed[state.idx] || 0;
+    if (used >= max) return;
+
+    used += 1;
+    state.hintUsed[state.idx] = used;
+
+    var isEn = (q.mode === 'zh2en' || q.mode === 'listen');
+    var answer = isEn ? q.en : q.zh;
+    var h = window.EngHint.build(answer, isEn, used, max);
+
+    var box = $('hintBox');
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div class="hb-line"><b>💡 提示 ' + used + ' / ' + max + '</b>' +
+      (cfg.deduct ? '<span class="hb-tag">本题积分按 ' + Math.round((+cfg.deductRatio || 0.5) * 100) + '% 计</span>' : '') +
+      '</div>' +
+      '<div class="hb-mask">' + escapeHtml(h.masked) + '</div>' +
+      '<div class="hb-tip">' + escapeHtml(h.tip) + '</div>' +
+      '<div class="hb-note">' + escapeHtml(h.note) + '</div>';
+
+    var btn = $('hintBtn');
+    if (h.done) {
+      btn.disabled = true;
+      btn.textContent = '💡 提示已用完';
+    } else {
+      btn.textContent = '💡 再看一点提示（' + used + ' / ' + max + '）';
+    }
+
+    // 开着语音时把提示读出来，方便还不识字的小朋友
+    if (SPCFG().enabled) speak(h.tip, null, { forEnglish: false });
+  }
+
   function submitAnswer() {
     if (state.answered) return;
     var q = state.queue[state.idx];
@@ -568,19 +566,22 @@
     var fb = $('feedback');
     var cfg = SPCFG();
 
-    // ---- v2：进度 + 激励 ----
+    // ---- v2：进度 + 激励（v2.1：用过提示的题按折扣计分） ----
     var p = AP();
-    var ev = EngStore.recordAnswer(p, r.ok);
+    var used = state.hintUsed[state.idx] || 0;
+    var factor = window.EngHint.factorOf(used, HCFG());
+    var ev = EngStore.recordAnswer(p, r.ok, factor);
     state.roundGained += ev.gained;
     if (ev.goalJustDone) state.roundGoalDone = true;
     persist();
     renderTodayCard();
+    var hintNote = (used > 0 && factor < 1) ? '<div class="ans-line">（本题用了提示，积分按 ' + Math.round(factor * 100) + '% 计）</div>' : '';
 
     if (r.ok) {
       state.score++;
       fb.className = 'feedback show ok';
       fb.innerHTML = '<b>✅ ' + (r.exact ? '完全正确！' : '答对了！（拼写略有差异，已按宽松模式判对）') + '</b>' +
-        '<div class="ans-line">+ ' + ev.gained + ' 分</div>' +
+        '<div class="ans-line">+ ' + ev.gained + ' 分</div>' + hintNote +
         '<div class="ans-line">参考答案：<span>' + escapeHtml(correctField) + '</span></div>';
       if (cfg.enabled && cfg.readFeedback) speak(r.exact ? 'Great job!' : 'Good! Well done.', null, { forEnglish: true });
       if (cfg.enabled && cfg.readAnswer && forEn) speak(correctField, null, { forEnglish: true });
@@ -589,10 +590,11 @@
         zh: q.zh, en: q.en, mode: q.mode,
         you: String(input).trim(),
         right: correctField,
-        ask: q.mode === 'en2zh' ? q.en : q.zh
+        ask: q.mode === 'en2zh' ? q.en : q.zh,
+        hint: used            // v2.1：记录这题用了几次提示
       });
       fb.className = 'feedback show bad';
-      fb.innerHTML = '<b>❌ 还差一点</b>' +
+      fb.innerHTML = '<b>❌ 还差一点</b>' + hintNote +
         '<div class="ans-line">你的答案：<span>' + escapeHtml(String(input).trim()) + '</span></div>' +
         '<div class="ans-line">正确答案：<span>' + escapeHtml(correctField) + '</span></div>' +
         (r.near ? '<div class="ans-line">（很接近了，注意拼写细节）</div>' : '');
@@ -616,7 +618,8 @@
     state.wrong.push({
       zh: q.zh, en: q.en, mode: q.mode,
       you: '（已跳过）', right: correctField,
-      ask: q.mode === 'en2zh' ? q.en : q.zh
+      ask: q.mode === 'en2zh' ? q.en : q.zh,
+      hint: state.hintUsed[state.idx] || 0    // v2.1
     });
     var fb = $('feedback');
     fb.className = 'feedback show info';
@@ -717,13 +720,20 @@
       box.style.display = 'none';
     }
 
+    // ---- v2.1：本轮用了提示的题统计 ----
+    var hinted = state.hintUsed.filter(function (n) { return n > 0; }).length;
+    if (hinted > 0) {
+      $('resultMeta').textContent += ' · 其中 ' + hinted + ' 题用了提示';
+    }
+
     var list = $('wrongList');
     if (!state.wrong.length) {
       list.innerHTML = '<div class="empty">🎯 本轮没有错题，非常棒！</div>';
     } else {
       list.innerHTML = state.wrong.map(function (w) {
         return '<div class="wrong-item">' +
-          '<div class="w-zh">' + escapeHtml(w.ask) + '</div>' +
+          '<div class="w-zh">' + escapeHtml(w.ask) +
+          (w.hint ? ' <span class="w-hint">💡 用了 ' + w.hint + ' 次提示</span>' : '') + '</div>' +
           '<div>你的答案：<span class="w-you">' + escapeHtml(w.you) + '</span></div>' +
           '<div>正确答案：<span class="w-right">' + escapeHtml(w.right) + '</span></div>' +
           '</div>';
@@ -771,6 +781,8 @@
       var q = state.queue[state.idx];
       if (q) speak(q.en, this);
     });
+    // v2.1：提示按钮
+    $('hintBtn').addEventListener('click', showHint);
     $('quitBtn').addEventListener('click', function () {
       if (confirm('确定退出本次练习吗？已答题目仍会计入学习进度。')) goto('home');
     });
@@ -1261,6 +1273,7 @@
           persist();
           applyConfig();
           loadSpeechUI();
+          loadHintUI();
           renderProfileChip();
           state.manageBankId = DATA.banks.length ? DATA.banks[0].id : null;
           renderManage();
@@ -1284,6 +1297,7 @@
       persist();
       applyConfig();
       loadSpeechUI();
+      loadHintUI();
       renderProfileChip();
       state.manageBankId = DATA.banks[0].id;
       renderManage();
@@ -1336,6 +1350,36 @@
       s.voiceName = $('spVoice').value;
       persist();
       showImpFb('ok', '✅ 语音设置已保存，下轮练习即生效。');
+    });
+  }
+
+  /* ---------- v2.1：提示设置 UI ---------- */
+  function loadHintUI() {
+    var h = HCFG();
+    if (!$('htEnabled')) return;
+    $('htEnabled').checked = (h.enabled !== false);
+    $('htMaxLevel').value = String(Math.max(1, Math.min(3, +h.maxLevel || 3)));
+    $('htDeduct').checked = !!h.deduct;
+    var r = (typeof h.deductRatio === 'number') ? h.deductRatio : 0.5;
+    $('htDeductRatio').value = String(r);
+  }
+
+  function bindHintSettings() {
+    if (!$('hintSaveBtn')) return;
+    $('hintSaveBtn').addEventListener('click', function () {
+      var h = DATA.config.hint;
+      h.enabled = $('htEnabled').checked;
+      h.maxLevel = parseInt($('htMaxLevel').value, 10) || 3;
+      h.deduct = $('htDeduct').checked;
+      h.deductRatio = parseFloat($('htDeductRatio').value);
+      if (isNaN(h.deductRatio)) h.deductRatio = 0.5;
+      persist();
+      loadHintUI();
+      var tip = $('hintSaveHint');
+      tip.textContent = '✅ 提示设置已保存：' + (h.enabled ? '练习时显示提示按钮' : '已关闭提示') +
+        ' · 单题最多 ' + h.maxLevel + ' 次 · ' +
+        (h.deduct ? '用过提示的题积分按 ' + Math.round(h.deductRatio * 100) + '% 计' : '用过提示不扣分') + '。';
+      if (SPCFG().enabled) speak('提示设置已保存', null, { forEnglish: false });
     });
   }
 
@@ -1392,6 +1436,8 @@
     bindManage();
     bindPlan();
     loadSpeechUI();
+    loadHintUI();
+    bindHintSettings();
     renderTodayCard();
     renderPlanHint();
 

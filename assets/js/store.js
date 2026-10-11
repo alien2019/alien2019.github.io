@@ -47,6 +47,13 @@ window.EngStore = (function () {
       voiceName: '',        // 指定语音名，空=自动
       recognize: false,     // 是否启用麦克风语音作答
       recogLang: 'en-US'    // 识别语言（英文题 en-US，中文题 zh-CN 自动切换）
+    },
+    hint: {
+      enabled: true,        // 总开关：练习时是否显示「给我点提示」按钮
+      maxLevel: 3,          // 单题最多提示几次（1~3）：1=长度+首字母，2=揭示部分，3=再揭示更多
+      showLength: true,     // 第一次提示时显示答案长度（几个字母/几个词/几个字）
+      deduct: true,         // 用过提示的题，积分是否打折（避免直接看答案刷分）
+      deductRatio: 0.5      // 折扣系数：0.5=该题积分按 50% 计
     }
   };
 
@@ -149,6 +156,8 @@ window.EngStore = (function () {
     d.config = Object.assign(clone(DEFAULT_CONFIG), d.config || {});
     // speech 子对象也要补齐，避免旧数据缺字段
     d.config.speech = Object.assign(clone(DEFAULT_CONFIG.speech), d.config.speech || {});
+    // 提示设置（v2.1）老数据缺字段时补齐
+    d.config.hint = Object.assign(clone(DEFAULT_CONFIG.hint), d.config.hint || {});
     if (!Array.isArray(d.banks)) d.banks = [];
     d.banks.forEach(function (b) {
       if (!b.id) b.id = uid('bank');
@@ -277,19 +286,25 @@ window.EngStore = (function () {
    * 记录一次答题
    * @param {object} p 档案
    * @param {boolean} ok 是否答对
+   * @param {number} [factor] 积分系数 0~1，默认 1（不打折）。
+   *                 用过提示的题由调用方传入折扣（如 0.5），避免直接看提示刷分。
    * @returns {object} 本次产生的激励事件 { gained, newBadges:[], goalJustDone:bool }
    */
-  function recordAnswer(p, ok) {
+  function recordAnswer(p, ok, factor) {
     var k = todayKey();
     var day = todayStat(p);
     var res = { gained: 0, newBadges: [], goalJustDone: false };
+    // 兼容旧调用：factor 缺省为 1，行为与 v2.0 完全一致
+    if (typeof factor !== 'number' || factor < 0 || factor > 1) factor = 1;
 
     day.done += 1;
     p.stats.totalDone += 1;
     if (ok) { day.right += 1; p.stats.totalRight += 1; }
 
-    res.gained += ok ? POINTS.right : POINTS.wrong;
-    p.stats.points += (ok ? POINTS.right : POINTS.wrong);
+    // 本题基础分（答对/答错），按 factor 打折；达标奖励与连击奖励不打折（鼓励坚持完成）
+    var base = Math.round((ok ? POINTS.right : POINTS.wrong) * factor);
+    res.gained += base;
+    p.stats.points += base;
 
     // 每日目标达成（只奖励一次：当天 done 首次达到目标）
     var goal = +p.plan.dailyGoal || 10;
